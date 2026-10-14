@@ -9,7 +9,7 @@ class RegisterSerializer(serializers.ModelSerializer):
 
     class Meta:
         model = User
-        fields = ['id', 'email', 'password', 'confirmed_password']
+        fields = ['id', 'username', 'email', 'password', 'confirmed_password']
         read_only_fields = ['id']
         extra_kwargs = {
             'password': {
@@ -36,8 +36,10 @@ class RegisterSerializer(serializers.ModelSerializer):
         validated_data.pop('confirmed_password')
 
         account = User(
-            email=validated_data['email']
+            email=self.validated_data['email'],
+            username=self.validated_data['username'],
         )
+        account.is_active = False
 
         account.set_password(password)
         account.save()
