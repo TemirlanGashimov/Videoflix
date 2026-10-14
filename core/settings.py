@@ -45,10 +45,10 @@ INSTALLED_APPS = [
     'django.contrib.messages',
     'django.contrib.staticfiles',
     'rest_framework',
-    'auth_app',
-    'video_app',
     'corsheaders',
     'django_rq',
+    'auth_app',
+    'video_app.apps.VideoAppConfig'
 
 ]
 
