@@ -48,7 +48,8 @@ INSTALLED_APPS = [
     'corsheaders',
     'django_rq',
     'auth_app',
-    'video_app.apps.VideoAppConfig'
+    'video_app.apps.VideoAppConfig',
+    'rest_framework_simplejwt',
 
 ]
 
@@ -170,4 +171,10 @@ MAILERS = {
     'default': {
         'BACKEND': 'django.core.mail.backends.console.EmailBackend',
     },
+}
+
+REST_FRAMEWORK = {
+    'DEFAULT_AUTHENTICATION_CLASSES': (
+        'rest_framework_simplejwt.authentication.JWTAuthentication',
+    )
 }
