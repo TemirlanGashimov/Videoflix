@@ -8,9 +8,11 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 
-from .serializers import RegisterSerializer
+from .serializers import RegisterSerializer, LoginSerializer
 
 from django.contrib.auth import get_user_model
+
+from .services import (set_auth_cookies)
 
 User = get_user_model()
 
@@ -68,3 +70,21 @@ class ActivateView(generics.GenericAPIView):
             return Response({'message': 'Account successfully activated.'},status=status.HTTP_200_OK)
         
         return Response(status=status.HTTP_400_BAD_REQUEST)
+
+
+class LoginView(generics.GenericAPIView):
+    serializer_class = LoginSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        refresh = serializer.validated_data['refresh']
+        access = serializer.validated_data['access']
+        user = serializer.validated_data ['user']
+        user_data = {"id":user.id, "username": user.username,}
+        response = Response(
+            {"detail": "Login successful", "user": user_data},
+            status=status.HTTP_200_OK
+        )
+        return set_auth_cookies(response, access, refresh)
