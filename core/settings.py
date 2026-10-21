@@ -50,6 +50,7 @@ INSTALLED_APPS = [
     'auth_app',
     'video_app.apps.VideoAppConfig',
     'rest_framework_simplejwt',
+    'rest_framework_simplejwt.token_blacklist',
 
 ]
 
