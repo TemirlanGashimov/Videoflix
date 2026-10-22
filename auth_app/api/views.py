@@ -174,9 +174,10 @@ class PasswordConfirmView(generics.GenericAPIView):
         try:
             uidb64 = urlsafe_base64_decode(uidb64)
             user_id = force_str(uidb64)
+            user = User.objects.filter(id=user_id).first()
         except (TypeError, ValueError, OverflowError):
             return Response({"detail": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
-        user = User.objects.filter(id=user_id).first()
+        
 
         if user is None or not default_token_generator.check_token(user, token):
             return Response({"detail": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
