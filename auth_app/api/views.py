@@ -9,7 +9,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 
-from .serializers import RegisterSerializer, LoginSerializer
+from .serializers import RegisterSerializer, LoginSerializer, PasswordResetSerializer
 
 from django.contrib.auth import get_user_model
 
@@ -136,3 +136,33 @@ class TokenRefreshView(generics.GenericAPIView):
         }, status=status.HTTP_200_OK)
         _set_auth_cookie(response, "access_token", access)
         return response
+
+
+class PasswordResetView(generics.GenericAPIView):
+    serializer_class = PasswordResetSerializer
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        email = serializer.validated_data['email']
+        user = User.objects.filter(email=email).first()
+        if user is not None:
+            token = default_token_generator.make_token(user)
+            user_id = force_bytes(user.id)
+            uidb64 = urlsafe_base64_encode(user_id)
+            reset_path = reverse("password_confirm", kwargs={
+                                 "uidb64": uidb64, "token": token})
+            reset_link = request.build_absolute_uri(reset_path)
+            send_mail(subject="Reset your Videoflix password",
+                      message=f"Hello! You requested a password reset for your Videoflix account. Please click the following link to reset your password: {reset_link}\n\nIf you did not request this, you can safely ignore this email.",
+                      from_email="noreply@videoflix.de",
+                      recipient_list=[user.email])
+        response = Response ({"detail": "An email has been sent to reset your password."}, status=status.HTTP_200_OK)
+        return response
+
+class PasswordConfirmView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+
+    def post(self, request, *args, **kwargs):
+        pass
