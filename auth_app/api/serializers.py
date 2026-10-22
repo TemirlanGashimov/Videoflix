@@ -77,3 +77,9 @@ class LoginSerializer(serializers.Serializer):
             'access': str(refresh.access_token),
             'user': user
         }
+
+class PasswordResetSerializer(serializers.Serializer):
+
+    email = serializers.EmailField()
+
+
