@@ -4,6 +4,8 @@ from django.contrib.auth import get_user_model
 from rest_framework_simplejwt.tokens import RefreshToken
 from rest_framework.exceptions import AuthenticationFailed
 from django.contrib.auth import authenticate
+from django.contrib.auth.password_validation import validate_password
+from django.core.exceptions import ValidationError
 
 
 User = get_user_model()
@@ -34,6 +36,15 @@ class RegisterSerializer(serializers.ModelSerializer):
     def validate_email(self, value):
         if User.objects.filter(email=value).exists():
             raise serializers.ValidationError("Email is already in use.")
+        return value
+    
+    def validate_password(self, value):
+        try:
+            validate_password(value)
+
+        except ValidationError as e:
+            raise serializers.ValidationError(e.messages)
+
         return value
 
     def create(self, validated_data):
@@ -94,5 +105,10 @@ class PasswordConfirmSerializer(serializers.Serializer):
 
         if new_password != confirm_password:
             raise serializers.ValidationError("Passwords do not match")
+        try:
+            validate_password(new_password)
+
+        except ValidationError as e:
+            raise serializers.ValidationError(e.messages)
 
         return attrs
