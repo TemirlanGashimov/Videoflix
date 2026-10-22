@@ -9,7 +9,7 @@ from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
 
-from .serializers import RegisterSerializer, LoginSerializer, PasswordResetSerializer
+from .serializers import RegisterSerializer, LoginSerializer, PasswordResetSerializer, PasswordConfirmSerializer
 
 from django.contrib.auth import get_user_model
 
@@ -163,6 +163,27 @@ class PasswordResetView(generics.GenericAPIView):
 
 class PasswordConfirmView(generics.GenericAPIView):
     permission_classes = [AllowAny]
+    serializer_class = PasswordConfirmSerializer
 
     def post(self, request, *args, **kwargs):
-        pass
+        serializer = self.get_serializer(data=request.data)
+        serializer.is_valid(raise_exception=True)
+        uidb64 = kwargs["uidb64"]
+        token = kwargs["token"]
+        
+        try:
+            uidb64 = urlsafe_base64_decode(uidb64)
+            user_id = force_str(uidb64)
+        except (TypeError, ValueError, OverflowError):
+            return Response({"detail": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
+        user = User.objects.filter(id=user_id).first()
+
+        if user is None or not default_token_generator.check_token(user, token):
+            return Response({"detail": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
+        new_password = serializer.validated_data["new_password"]
+        user.set_password(new_password)
+        user.save()
+        return Response ({"detail":"Your Password has been successfully reset."}, status=status.HTTP_200_OK)
+
+
+        
