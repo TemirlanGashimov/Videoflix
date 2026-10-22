@@ -1,13 +1,16 @@
 from rest_framework import generics, status
-from rest_framework.permissions import AllowAny
+from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
 from rest_framework_simplejwt.tokens import RefreshToken, TokenError
+from django.middleware.csrf import get_token
 
 from django.urls import reverse
 from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
 from django.utils.encoding import force_bytes, force_str
 from django.contrib.auth.tokens import default_token_generator
 from django.core.mail import send_mail
+from django.views.decorators.csrf import csrf_protect
+from django.utils.decorators import method_decorator
 
 from .serializers import RegisterSerializer, LoginSerializer, PasswordResetSerializer, PasswordConfirmSerializer
 
@@ -24,6 +27,7 @@ User = get_user_model()
 class RegisterView(generics.CreateAPIView):
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -58,6 +62,7 @@ class RegisterView(generics.CreateAPIView):
 class ActivateView(generics.GenericAPIView):
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def get(self, request, uidb64, token):
         try:
@@ -77,9 +82,11 @@ class ActivateView(generics.GenericAPIView):
         return Response(status=status.HTTP_400_BAD_REQUEST)
 
 
+@method_decorator(csrf_protect, name='dispatch')
 class LoginView(generics.GenericAPIView):
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -94,10 +101,11 @@ class LoginView(generics.GenericAPIView):
         )
         return set_auth_cookies(response, access, refresh)
 
-
+@method_decorator(csrf_protect, name='dispatch')
 class LogoutView(generics.GenericAPIView):
 
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get('refresh_token')
@@ -115,8 +123,26 @@ class LogoutView(generics.GenericAPIView):
         return clear_auth_cookies(response)
 
 
+class CSRFTokenView(generics.GenericAPIView):
+    permission_classes = [AllowAny]
+    authentication_classes = []
+
+    def get(self, request, *args, **kwargs):
+        csrf_token = get_token(request)
+
+        return Response({"csrfToken": csrf_token}, status=status.HTTP_200_OK)
+
+
+class AuthTestView(generics.GenericAPIView):
+    permission_classes = [IsAuthenticated]
+
+    def get(self, request, *args, **kwargs):
+        return Response({"email": request.user.email}, status=status.HTTP_200_OK)
+
+@method_decorator(csrf_protect, name='dispatch')
 class TokenRefreshView(generics.GenericAPIView):
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get('refresh_token')
@@ -141,6 +167,7 @@ class TokenRefreshView(generics.GenericAPIView):
 class PasswordResetView(generics.GenericAPIView):
     serializer_class = PasswordResetSerializer
     permission_classes = [AllowAny]
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
@@ -158,33 +185,32 @@ class PasswordResetView(generics.GenericAPIView):
                       message=f"Hello! You requested a password reset for your Videoflix account. Please click the following link to reset your password: {reset_link}\n\nIf you did not request this, you can safely ignore this email.",
                       from_email="noreply@videoflix.de",
                       recipient_list=[user.email])
-        response = Response ({"detail": "An email has been sent to reset your password."}, status=status.HTTP_200_OK)
+        response = Response(
+            {"detail": "An email has been sent to reset your password."}, status=status.HTTP_200_OK)
         return response
+
 
 class PasswordConfirmView(generics.GenericAPIView):
     permission_classes = [AllowAny]
     serializer_class = PasswordConfirmSerializer
+    authentication_classes = []
 
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         uidb64 = kwargs["uidb64"]
         token = kwargs["token"]
-        
+
         try:
             uidb64 = urlsafe_base64_decode(uidb64)
             user_id = force_str(uidb64)
             user = User.objects.filter(id=user_id).first()
         except (TypeError, ValueError, OverflowError):
             return Response({"detail": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
-        
 
         if user is None or not default_token_generator.check_token(user, token):
             return Response({"detail": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
         new_password = serializer.validated_data["new_password"]
         user.set_password(new_password)
         user.save()
-        return Response ({"detail":"Your Password has been successfully reset."}, status=status.HTTP_200_OK)
-
-
-        
+        return Response({"detail": "Your Password has been successfully reset."}, status=status.HTTP_200_OK)
