@@ -7,3 +7,4 @@ class Video(models.Model):
     description = models.TextField()
     thumbnail_url = models.URLField()
     category = models.CharField(max_length=255)
+    video_file = models.FileField(upload_to='videos/', blank=True, null=True)
