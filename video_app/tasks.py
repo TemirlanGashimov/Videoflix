@@ -1,3 +1,5 @@
+"""Background tasks for generating HLS video renditions."""
+
 from .models import Video
 from django.conf import settings
 from pathlib import Path
@@ -5,6 +7,7 @@ from subprocess import run
 
 
 def _convert_video_resolution(input_path, output_dir, resolution, height):
+    """Encode one resolution into an HLS playlist and transport-stream segments."""
     resolution_dir = output_dir / resolution
     resolution_dir.mkdir(parents=True, exist_ok=True)
     playlist_path = resolution_dir / "index.m3u8"
@@ -20,6 +23,7 @@ def _convert_video_resolution(input_path, output_dir, resolution, height):
 
 
 def convert_video_to_hls(video_id):
+    """Generate HLS renditions for a stored video using FFmpeg."""
     video = Video.objects.get(id=video_id)
     if not video.video_file:
         raise ValueError("No video file available.")
