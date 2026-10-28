@@ -1,28 +1,28 @@
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
-from rest_framework_simplejwt.tokens import RefreshToken, TokenError
 from django.middleware.csrf import get_token
 
-from django.urls import reverse
-from django.utils.http import urlsafe_base64_encode, urlsafe_base64_decode
-from django.utils.encoding import force_bytes, force_str
-from django.contrib.auth.tokens import default_token_generator
-from django.core.mail import send_mail
 from django.views.decorators.csrf import csrf_protect
 from django.utils.decorators import method_decorator
 
-from .serializers import RegisterSerializer, LoginSerializer, PasswordResetSerializer, PasswordConfirmSerializer
+from .serializers import (
+    LoginSerializer,
+    PasswordConfirmSerializer,
+    PasswordResetSerializer,
+    RegisterSerializer,
+)
+from .cookies import clear_auth_cookies, set_auth_cookies, _set_auth_cookie
 
-from django.contrib.auth import get_user_model
-
-from .cookies import (set_auth_cookies,
-                       clear_auth_cookies,
-                       _set_auth_cookie)
-
-from .services import blacklist_refresh_token
-
-User = get_user_model()
+from .services import (
+    activate_user,
+    blacklist_refresh_token,
+    complete_password_reset,
+    create_access_token,
+    get_activation_user,
+    send_activation_email,
+    send_password_reset_email,
+)
 
 
 class RegisterView(generics.CreateAPIView):
@@ -33,30 +33,16 @@ class RegisterView(generics.CreateAPIView):
     def create(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-
         user = serializer.save()
-
         user.is_active = False
         user.save()
-        uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-        token = default_token_generator.make_token(user)
-        activation_path = reverse(
-            "activate", kwargs={"uidb64": uidb64, "token": token})
-        activation_link = request.build_absolute_uri(activation_path)
-
-        send_mail(subject="Activate your Videoflix account",
-                  message=f"Welcome to Videoflix! Please activate your account by clicking the following link {activation_link}",
-                  from_email="noreply@videoflix.de",
-                  recipient_list=[user.email])
-
+        token = send_activation_email(user, request)
         return Response(
-            {'user': {
-                'id': user.id,
-                'email': user.email
+            {
+                "user": {"id": user.id, "email": user.email},
+                "token": token,
             },
-                'token': token
-            },
-            status=status.HTTP_201_CREATED
+            status=status.HTTP_201_CREATED,
         )
 
 
@@ -66,21 +52,15 @@ class ActivateView(generics.GenericAPIView):
     authentication_classes = []
 
     def get(self, request, uidb64, token):
-        try:
-            uidb64 = urlsafe_base64_decode(uidb64)
-            user_id = force_str(uidb64)
-            user = User.objects.get(pk=user_id)
-
-        except (User.DoesNotExist, ValueError):
+        user = get_activation_user(uidb64)
+        if user is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        if default_token_generator.check_token(user, token):
-            user.is_active = True
-            user.save()
-
-            return Response({'message': 'Account successfully activated.'}, status=status.HTTP_200_OK)
-
-        return Response(status=status.HTTP_400_BAD_REQUEST)
+        if not activate_user(user, token):
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        return Response(
+            {"message": "Account successfully activated."},
+            status=status.HTTP_200_OK,
+        )
 
 
 @method_decorator(csrf_protect, name='dispatch')
@@ -112,13 +92,11 @@ class LogoutView(generics.GenericAPIView):
         refresh_token = request.COOKIES.get('refresh_token')
         if not refresh_token:
             return Response(status=status.HTTP_400_BAD_REQUEST)
-
-        success = blacklist_refresh_token(refresh_token)
-        if not success:
+        if not blacklist_refresh_token(refresh_token):
             return Response(status=status.HTTP_400_BAD_REQUEST)
-
         response = Response(
-            {"detail": "Logout successful! All tokens will be deleted. Refresh token is now invalid."},
+            {"detail": "Logout successful! All tokens will be deleted. "
+                       "Refresh token is now invalid."},
             status=status.HTTP_200_OK,
         )
         return clear_auth_cookies(response)
@@ -148,18 +126,13 @@ class TokenRefreshView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         refresh_token = request.COOKIES.get('refresh_token')
         if not refresh_token:
-            return Response(status=status.HTTP_400_BAD_REQUEST,
-                            )
-        try:
-            refresh = RefreshToken(refresh_token)
-            access = refresh.access_token
-
-        except TokenError:
+            return Response(status=status.HTTP_400_BAD_REQUEST)
+        access = create_access_token(refresh_token)
+        if access is None:
             return Response(status=status.HTTP_401_UNAUTHORIZED)
-
         response = Response({
             "detail": "Token refreshed",
-            "access": str(access),
+            "access": access,
         }, status=status.HTTP_200_OK)
         _set_auth_cookie(response, "access_token", access)
         return response
@@ -173,22 +146,11 @@ class PasswordResetView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        email = serializer.validated_data['email']
-        user = User.objects.filter(email=email).first()
-        if user is not None:
-            token = default_token_generator.make_token(user)
-            user_id = force_bytes(user.id)
-            uidb64 = urlsafe_base64_encode(user_id)
-            reset_path = reverse("password_confirm", kwargs={
-                                 "uidb64": uidb64, "token": token})
-            reset_link = request.build_absolute_uri(reset_path)
-            send_mail(subject="Reset your Videoflix password",
-                      message=f"Hello! You requested a password reset for your Videoflix account. Please click the following link to reset your password: {reset_link}\n\nIf you did not request this, you can safely ignore this email.",
-                      from_email="noreply@videoflix.de",
-                      recipient_list=[user.email])
-        response = Response(
-            {"detail": "An email has been sent to reset your password."}, status=status.HTTP_200_OK)
-        return response
+        send_password_reset_email(serializer.validated_data["email"], request)
+        return Response(
+            {"detail": "An email has been sent to reset your password."},
+            status=status.HTTP_200_OK,
+        )
 
 
 class PasswordConfirmView(generics.GenericAPIView):
@@ -199,19 +161,20 @@ class PasswordConfirmView(generics.GenericAPIView):
     def post(self, request, *args, **kwargs):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
-        uidb64 = kwargs["uidb64"]
-        token = kwargs["token"]
+        result = complete_password_reset(
+            kwargs["uidb64"], kwargs["token"],
+            serializer.validated_data["new_password"],
+        )
+        return password_reset_response(result)
 
-        try:
-            uidb64 = urlsafe_base64_decode(uidb64)
-            user_id = force_str(uidb64)
-            user = User.objects.filter(id=user_id).first()
-        except (TypeError, ValueError, OverflowError):
-            return Response({"detail": "Invalid reset link."}, status=status.HTTP_400_BAD_REQUEST)
 
-        if user is None or not default_token_generator.check_token(user, token):
-            return Response({"detail": "Invalid or expired reset link."}, status=status.HTTP_400_BAD_REQUEST)
-        new_password = serializer.validated_data["new_password"]
-        user.set_password(new_password)
-        user.save()
-        return Response({"detail": "Your Password has been successfully reset."}, status=status.HTTP_200_OK)
+def password_reset_response(result):
+    messages = {
+        None: "Invalid reset link.",
+        False: "Invalid or expired reset link.",
+        True: "Your Password has been successfully reset.",
+    }
+    response_status = (
+        status.HTTP_200_OK if result is True else status.HTTP_400_BAD_REQUEST
+    )
+    return Response({"detail": messages[result]}, status=response_status)
