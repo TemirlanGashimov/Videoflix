@@ -1,3 +1,5 @@
+"""Authenticated endpoints for HLS playlists and media segments."""
+
 from pathlib import Path
 from django.conf import settings
 from django.http import FileResponse
@@ -8,9 +10,12 @@ import re
 
 
 class HLSPlaylistView(generics.GenericAPIView):
+    """Serve an existing HLS playlist at an allowed resolution."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request, movie_id, resolution):
+        """Return the requested playlist or a not-found response."""
         allowed_resolutions = ["480p", "720p", "1080p"]
         if resolution not in allowed_resolutions:
             return Response({"detail": "Resolution not found."}, status=status.HTTP_404_NOT_FOUND)
@@ -21,9 +26,12 @@ class HLSPlaylistView(generics.GenericAPIView):
 
 
 class HLSSegmentView(generics.GenericAPIView):
+    """Serve an existing HLS transport-stream segment."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request, movie_id, resolution, segment):
+        """Return a validated segment path or a not-found response."""
         allowed_resolutions = ["480p", "720p", "1080p"]
         if resolution not in allowed_resolutions:
             return Response({"detail": "Resolution not found."}, status=status.HTTP_404_NOT_FOUND)
