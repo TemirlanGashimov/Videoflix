@@ -20,6 +20,7 @@ def convert_video_to_hls(video_id):
         resolution_dir.mkdir(parents=True, exist_ok=True)
         playlist_path = resolution_dir / "index.m3u8"
         segment_path = str(resolution_dir / "segment_%03d.ts")
-        command = ["ffmpeg", "-y", "-i", input_path, "-vf", scale_filter, "-c:v", "libx264", "-threads", "1", "-c:a", "aac", "-f",
-                   "hls", "-hls_time", "6", "-hls_playlist_type", "vod", "-hls_segment_filename", segment_path, str(playlist_path)]
+        command = ["ffmpeg", "-nostdin", "-y", "-i", input_path, "-vf", scale_filter, "-c:v", "libx264", "-threads", "1", "-c:a", 
+                   "aac", "-f","hls", "-hls_time", "6", "-hls_playlist_type", "vod", "-hls_segment_filename", 
+                   segment_path, str(playlist_path)]
         run(command, check=True)
