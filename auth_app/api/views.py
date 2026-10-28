@@ -1,3 +1,5 @@
+"""Authentication API views for registration, sessions, and password recovery."""
+
 from rest_framework import generics, status
 from rest_framework.permissions import AllowAny, IsAuthenticated
 from rest_framework.response import Response
@@ -26,11 +28,14 @@ from .services import (
 
 
 class RegisterView(generics.CreateAPIView):
+    """Create an inactive account and send its activation email."""
+
     serializer_class = RegisterSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def create(self, request, *args, **kwargs):
+        """Validate registration data and return the new account and token."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
@@ -47,11 +52,13 @@ class RegisterView(generics.CreateAPIView):
 
 
 class ActivateView(generics.GenericAPIView):
+    """Activate an account using the UID and token from its email link."""
 
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def get(self, request, uidb64, token):
+        """Validate the activation link and activate its account."""
         user = get_activation_user(uidb64)
         if user is None:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -65,11 +72,14 @@ class ActivateView(generics.GenericAPIView):
 
 @method_decorator(csrf_protect, name='dispatch')
 class LoginView(generics.GenericAPIView):
+    """Authenticate a user and set access and refresh cookies."""
+
     serializer_class = LoginSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
+        """Authenticate the submitted credentials and return user details."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         refresh = serializer.validated_data['refresh']
@@ -84,11 +94,13 @@ class LoginView(generics.GenericAPIView):
 
 @method_decorator(csrf_protect, name='dispatch')
 class LogoutView(generics.GenericAPIView):
+    """Invalidate the refresh token and clear authentication cookies."""
 
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
+        """Blacklist the refresh cookie and remove both token cookies."""
         refresh_token = request.COOKIES.get('refresh_token')
         if not refresh_token:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -103,27 +115,36 @@ class LogoutView(generics.GenericAPIView):
 
 
 class CSRFTokenView(generics.GenericAPIView):
+    """Provide a CSRF token for clients making protected requests."""
+
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def get(self, request, *args, **kwargs):
+        """Return the CSRF token associated with the current request."""
         csrf_token = get_token(request)
 
         return Response({"csrfToken": csrf_token}, status=status.HTTP_200_OK)
 
 
 class AuthTestView(generics.GenericAPIView):
+    """Return the email address of the authenticated user."""
+
     permission_classes = [IsAuthenticated]
 
     def get(self, request, *args, **kwargs):
+        """Respond with the authenticated user's email address."""
         return Response({"email": request.user.email}, status=status.HTTP_200_OK)
 
 @method_decorator(csrf_protect, name='dispatch')
 class TokenRefreshView(generics.GenericAPIView):
+    """Issue a new access token from the refresh-token cookie."""
+
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
+        """Refresh the access token and replace its cookie."""
         refresh_token = request.COOKIES.get('refresh_token')
         if not refresh_token:
             return Response(status=status.HTTP_400_BAD_REQUEST)
@@ -139,11 +160,14 @@ class TokenRefreshView(generics.GenericAPIView):
 
 
 class PasswordResetView(generics.GenericAPIView):
+    """Request a password-reset email for the submitted email address."""
+
     serializer_class = PasswordResetSerializer
     permission_classes = [AllowAny]
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
+        """Validate the email and send a reset link when an account exists."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         send_password_reset_email(serializer.validated_data["email"], request)
@@ -154,11 +178,14 @@ class PasswordResetView(generics.GenericAPIView):
 
 
 class PasswordConfirmView(generics.GenericAPIView):
+    """Set a new password using a UID and token from a reset link."""
+
     permission_classes = [AllowAny]
     serializer_class = PasswordConfirmSerializer
     authentication_classes = []
 
     def post(self, request, *args, **kwargs):
+        """Validate the new password and complete the reset."""
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         result = complete_password_reset(
@@ -169,6 +196,7 @@ class PasswordConfirmView(generics.GenericAPIView):
 
 
 def password_reset_response(result):
+    """Build the API response for a password-reset result."""
     messages = {
         None: "Invalid reset link.",
         False: "Invalid or expired reset link.",
