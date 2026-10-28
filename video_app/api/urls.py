@@ -1,3 +1,5 @@
+"""URL routes for the video catalog and HLS playback endpoints."""
+
 from django.urls import path
 from .views import VideoListView
 from .hls_views import HLSPlaylistView, HLSSegmentView
