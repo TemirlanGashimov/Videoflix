@@ -16,10 +16,11 @@ from .serializers import RegisterSerializer, LoginSerializer, PasswordResetSeria
 
 from django.contrib.auth import get_user_model
 
-from .services import (set_auth_cookies,
-                       blacklist_refresh_token,
+from .cookies import (set_auth_cookies,
                        clear_auth_cookies,
                        _set_auth_cookie)
+
+from .services import blacklist_refresh_token
 
 User = get_user_model()
 
