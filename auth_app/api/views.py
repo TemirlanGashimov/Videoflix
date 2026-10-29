@@ -39,9 +39,9 @@ class RegisterView(generics.CreateAPIView):
         serializer = self.get_serializer(data=request.data)
         serializer.is_valid(raise_exception=True)
         user = serializer.save()
-        user.is_active = False
-        user.save()
         token = send_activation_email(user, request)
+        if token is None:
+            return Response({"detail": "Activation email could not be sent."}, status=status.HTTP_503_SERVICE_UNAVAILABLE)
         return Response(
             {
                 "user": {"id": user.id, "email": user.email},
