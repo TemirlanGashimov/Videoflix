@@ -70,7 +70,6 @@ class ActivateView(generics.GenericAPIView):
         )
 
 
-@method_decorator(csrf_protect, name='dispatch')
 class LoginView(generics.GenericAPIView):
     """Authenticate a user and set access and refresh cookies."""
 
