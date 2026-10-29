@@ -8,6 +8,7 @@ from django.core.exceptions import ValidationError
 
 from .services import create_user_tokens, get_user_for_login
 
+import uuid
 
 User = get_user_model()
 
@@ -21,7 +22,7 @@ class RegisterSerializer(serializers.ModelSerializer):
         """Configure the fields exposed by the registration endpoint."""
 
         model = User
-        fields = ['id', 'username', 'email', 'password', 'confirmed_password']
+        fields = ['id', 'email', 'password', 'confirmed_password']
         read_only_fields = ['id']
         extra_kwargs = {
             'password': {
@@ -61,8 +62,8 @@ class RegisterSerializer(serializers.ModelSerializer):
         validated_data.pop('confirmed_password')
 
         account = User(
-            email=self.validated_data['email'],
-            username=self.validated_data['username'],
+            email=validated_data['email'],
+            username=validated_data["email"]
         )
         account.is_active = False
 
