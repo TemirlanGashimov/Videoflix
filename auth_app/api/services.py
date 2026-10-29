@@ -9,7 +9,12 @@ from django.utils.http import urlsafe_base64_decode, urlsafe_base64_encode
 from rest_framework.exceptions import AuthenticationFailed
 from rest_framework_simplejwt.exceptions import TokenError
 from rest_framework_simplejwt.tokens import RefreshToken
+from django.conf import settings
+from smtplib import SMTPException
+import logging
 
+
+logger = logging.getLogger(__name__)
 
 User = get_user_model()
 
@@ -49,7 +54,8 @@ def create_user_tokens(user):
 def create_activation_link(user, request, token):
     """Build an absolute URL for activating the given user account."""
     uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-    activation_path = reverse("activate", kwargs={"uidb64": uidb64, "token": token})
+    activation_path = reverse(
+        "activate", kwargs={"uidb64": uidb64, "token": token})
     return request.build_absolute_uri(activation_path)
 
 
@@ -57,15 +63,21 @@ def send_activation_email(user, request):
     """Send an activation email and return its generated token."""
     token = default_token_generator.make_token(user)
     activation_link = create_activation_link(user, request, token)
-    send_mail(
-        subject="Activate your Videoflix account",
-        message=(
-            "Welcome to Videoflix! Please activate your account by clicking "
-            f"the following link {activation_link}"
-        ),
-        from_email="noreply@videoflix.de",
-        recipient_list=[user.email],
-    )
+
+    try:
+        send_mail(
+            subject="Activate your Videoflix account",
+            message=(
+                "Welcome to Videoflix! Please activate your account by clicking "
+                f"the following link {activation_link}"
+            ),
+            from_email=settings.DEFAULT_FROM_EMAIL,
+            recipient_list=[user.email],
+        )
+    except SMTPException:
+        logger.error("Activation email could not be sent.")
+        return None
+
     return token
 
 
@@ -91,7 +103,8 @@ def create_password_reset_link(user, request):
     """Build an absolute password-reset URL for the given user."""
     token = default_token_generator.make_token(user)
     uidb64 = urlsafe_base64_encode(force_bytes(user.id))
-    reset_path = reverse("password_confirm", kwargs={"uidb64": uidb64, "token": token})
+    reset_path = reverse("password_confirm", kwargs={
+                         "uidb64": uidb64, "token": token})
     return request.build_absolute_uri(reset_path)
 
 
@@ -114,7 +127,7 @@ def _send_password_reset_email(user, reset_link):
             f"{reset_link}\n\n"
             "If you did not request this, you can safely ignore this email."
         ),
-        from_email="noreply@videoflix.de",
+        from_email=settings.DEFAULT_FROM_EMAIL,
         recipient_list=[user.email],
     )
 
