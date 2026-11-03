@@ -54,9 +54,13 @@ def create_user_tokens(user):
 def create_activation_link(user, request, token):
     """Build an absolute URL for activating the given user account."""
     uidb64 = urlsafe_base64_encode(force_bytes(user.pk))
-    activation_path = reverse(
-        "activate", kwargs={"uidb64": uidb64, "token": token})
-    return request.build_absolute_uri(activation_path)
+    return (
+        f"http://127.0.0.1:5500/pages/auth/activate.html"
+        f"?uid={uidb64}&token={token}"
+    )
+    # activation_path = reverse(
+    #     "activate", kwargs={"uidb64": uidb64, "token": token})
+    # return request.build_absolute_uri(activation_path)
 
 
 def send_activation_email(user, request):
