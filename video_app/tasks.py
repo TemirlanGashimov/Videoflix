@@ -4,7 +4,8 @@ from .models import Video
 from django.conf import settings
 from pathlib import Path
 from subprocess import run
-
+from django.core.files import File
+from tempfile import TemporaryDirectory
 
 def _convert_video_resolution(input_path, output_dir, resolution, height):
     """Encode one resolution into an HLS playlist and transport-stream segments."""
@@ -25,11 +26,38 @@ def _convert_video_resolution(input_path, output_dir, resolution, height):
 def convert_video_to_hls(video_id):
     """Generate HLS renditions for a stored video using FFmpeg."""
     video = Video.objects.get(id=video_id)
+
     if not video.video_file:
         raise ValueError("No video file available.")
+
+    generate_thumbnail(video)
+    
     input_path = video.video_file.path
     output_dir = Path(settings.MEDIA_ROOT)/"hls" / str(video_id)
     output_dir.mkdir(parents=True, exist_ok=True)
+
     resolutions = {"480p": 480, "720p": 720, "1080p": 1080}
+    
     for resolution, height in resolutions.items():
         _convert_video_resolution(input_path, output_dir, resolution, height)
+
+
+def generate_thumbnail(video):
+    """Generate and save a thumbnail from the first second of a video."""
+    with TemporaryDirectory() as temp_dir:
+        thumbnail_path = Path(temp_dir) / "thumbnail.jpg"
+
+        run([
+            "ffmpeg", "-nostdin", "-y",
+            "-ss", "1",
+            "-i", video.video_file.path,
+            "-frames:v", "1",
+            str(thumbnail_path),
+        ], check=True)
+
+        with thumbnail_path.open("rb") as image:
+            video.thumbnail.save(
+                f"video_{video.pk}.jpg",
+                File(image),
+                save=True,
+            )
