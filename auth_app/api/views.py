@@ -91,7 +91,7 @@ class LoginView(generics.GenericAPIView):
         )
         return set_auth_cookies(response, access, refresh)
 
-@method_decorator(csrf_protect, name='dispatch')
+
 class LogoutView(generics.GenericAPIView):
     """Invalidate the refresh token and clear authentication cookies."""
 
