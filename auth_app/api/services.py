@@ -13,6 +13,9 @@ from django.conf import settings
 from smtplib import SMTPException
 import logging
 
+from django.template.loader import render_to_string
+from django.core.mail import EmailMultiAlternatives
+
 
 logger = logging.getLogger(__name__)
 
@@ -65,16 +68,22 @@ def send_activation_email(user, request):
     token = default_token_generator.make_token(user)
     activation_link = create_activation_link(user, request, token)
 
+    html_content = render_to_string("emails/activation_email.html", {
+        "user_name": user.username,
+        "activation_link": activation_link,
+    })
+
+    email = EmailMultiAlternatives(
+        subject="Activate your Videoflix account",
+        body=f"Activate your account: {activation_link}",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+    email.attach_alternative(html_content, "text/html")
+
+
     try:
-        send_mail(
-            subject="Activate your Videoflix account",
-            message=(
-                "Welcome to Videoflix! Please activate your account by clicking "
-                f"the following link {activation_link}"
-            ),
-            from_email=settings.DEFAULT_FROM_EMAIL,
-            recipient_list=[user.email],
-        )
+       email.send()
     except SMTPException:
         logger.error("Activation email could not be sent.")
         return None
@@ -104,9 +113,10 @@ def create_password_reset_link(user, request):
     """Build an absolute password-reset URL for the given user."""
     token = default_token_generator.make_token(user)
     uidb64 = urlsafe_base64_encode(force_bytes(user.id))
-    reset_path = reverse("password_confirm", kwargs={
-                         "uidb64": uidb64, "token": token})
-    return request.build_absolute_uri(reset_path)
+    return (
+        "http://127.0.0.1:5500/pages/auth/confirm_password.html"
+        f"?uid={uidb64}&token={token}"
+    )
 
 
 def send_password_reset_email(email, request):
@@ -119,18 +129,21 @@ def send_password_reset_email(email, request):
 
 
 def _send_password_reset_email(user, reset_link):
-    """Send the reset message to the user's registered email address."""
-    send_mail(
-        subject="Reset your Videoflix password",
-        message=(
-            "Hello! You requested a password reset for your Videoflix account. "
-            "Please click the following link to reset your password: "
-            f"{reset_link}\n\n"
-            "If you did not request this, you can safely ignore this email."
-        ),
-        from_email=settings.DEFAULT_FROM_EMAIL,
-        recipient_list=[user.email],
+    """Send a password reset email using a Django HTML template."""
+    html_content = render_to_string(
+        "emails/password_reset_email.html",
+        {"reset_link": reset_link},
     )
+
+    email = EmailMultiAlternatives(
+        subject="Reset your Password",
+        body=f"Reset your password: {reset_link}",
+        from_email=settings.DEFAULT_FROM_EMAIL,
+        to=[user.email],
+    )
+
+    email.attach_alternative(html_content, "text/html")
+    email.send()
 
 
 def get_password_reset_user(uidb64):
