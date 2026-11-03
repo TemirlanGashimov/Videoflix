@@ -6,7 +6,7 @@ from .models import Video
 class VideoAdmin(admin.ModelAdmin):
     """Admin options for video records."""
 
-    pass
+    exclude = ("thumbnail",)
 
 
 admin.site.register(Video, VideoAdmin)
