@@ -37,7 +37,7 @@ def convert_video_to_hls(video_id):
     output_dir.mkdir(parents=True, exist_ok=True)
 
     resolutions = {"480p": 480, "720p": 720, "1080p": 1080}
-    
+
     for resolution, height in resolutions.items():
         _convert_video_resolution(input_path, output_dir, resolution, height)
 
@@ -61,3 +61,4 @@ def generate_thumbnail(video):
                 File(image),
                 save=True,
             )
+
