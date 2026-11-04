@@ -27,3 +27,6 @@ class Video(models.Model):
         choices=CATEGORY_CHOICES,
     )
     video_file = models.FileField(upload_to='videos/', blank=True, null=True)
+
+    def __str__(self):
+        return self.title
