@@ -7,6 +7,7 @@ from subprocess import run
 from django.core.files import File
 from tempfile import TemporaryDirectory
 
+
 def _convert_video_resolution(input_path, output_dir, resolution, height):
     """Encode one resolution into an HLS playlist and transport-stream segments."""
     resolution_dir = output_dir / resolution

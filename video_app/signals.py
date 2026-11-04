@@ -7,6 +7,7 @@ import django_rq
 from .tasks import convert_video_to_hls
 from django.db import transaction
 
+
 @receiver(post_save, sender=Video)
 def video_post_save(sender, instance, created, **kwargs):
     """Queue HLS conversion after a newly uploaded video is committed."""
